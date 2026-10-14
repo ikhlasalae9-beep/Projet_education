@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CPGE Maroc - Analyse Territoriale et Capacitaire</title>
+    <script src="https://cdn.plot.ly/plotly-2.32.0.min.js"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-canvas: #061325;
+            --bg-card: #0C213B;
+            --bg-header: #091B32;
+            --border-card: #16365F;
+            --cyan: #00D4FF;
+            --pink: #FF007F;
+            --amber: #FFB703;
+            --emerald: #00E5A3;
+            --purple: #C084FC;
+            --text-main: #FFFFFF;
+            --text-muted: #94A3B8;
+            --text-light: #CBD5E1;
+        }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', 'Segoe UI', sans-serif;
+        }
+        body {
+            background-color: var(--bg-canvas);
+            color: var(--text-main);
+            padding: 16px 20px;
+            min-height: 100vh;
+        }
+        .dashboard-shell {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+        /* Top Bar identical to reference image */
+        .top-bar {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 10px;
+            padding: 12px 22px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+        .brand-title {
+            color: var(--cyan);
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: 0.2px;
+        }
+        .brand-sub {
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            margin-top: 2px;
+        }
+        .top-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        .filter-select, .filter-input {
+            background-color: #061325;
+            color: #E2E8F0;
+            border: 1px solid #1E4976;
+            border-radius: 6px;
+            padding: 7px 12px;
+            font-size: 0.8rem;
+            outline: none;
+        }
+        .filter-select:focus, .filter-input:focus {
+            border-color: var(--cyan);
+        }
+        .tab-btn {
+            background-color: transparent;
+            color: var(--cyan);
+            border: 1px solid var(--cyan);
+            border-radius: 6px;
+            padding: 7px 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .tab-btn.active, .tab-btn:hover {
+            background-color: var(--cyan);
+            color: #061325;
+        }
+        /* Row 1: 4 KPI Cards with Sparklines */
+        .kpi-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+        .card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-card);
+            border-radius: 12px;
+            padding: 16px 18px;
+            box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+            position: relative;
+        }
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 6px;
+        }
+        .card-title {
+            font-size: 0.95rem;
+            font-weight: 600;
+            color: var(--text-main);
+        }
+        .card-subtitle {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .info-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.12);
+            color: #94A3B8;
+            font-size: 0.72rem;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-style: italic;
+            flex-shrink: 0;
+        }
+        .kpi-stats {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-top: 4px;
+        }
+        .kpi-main-val {
+            font-size: 1.05rem;
+            font-weight: 700;
+        }
+        .kpi-sep {
+            color: #334155;
+        }
+        .kpi-sub-val {
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .kpi-growth {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--emerald);
+            margin-top: 3px;
+            margin-bottom: 6px;
+        }
+        .spark-svg {
+            width: 100%;
+            height: 60px;
+            display: block;
+        }
+        /* Main 3-Column Analytical Grid */
+        .middle-row, .bottom-row {
+            display: grid;
+            grid-template-columns: 1.05fr 1.15fr 1.2fr;
+            gap: 16px;
+        }
+        .chart-box {
+            width: 100%;
+            height: 295px;
+        }
+        .leaflet-tile-pane { filter: invert(100%) hue-rotate(185deg) brightness(92%) contrast(90%); }
+        .leaflet-tile-pane { filter: invert(100%) hue-rotate(185deg) brightness(92%) contrast(90%); }
+        #map {
+            width: 100%;
+            height: 295px;
+            border-radius: 8px;
+            border: 1px solid #16365F;
+            background: #061325;
+        }
+        /* Dark Tables */
+        .table-scroll {
+            max-height: 295px;
+            overflow-y: auto;
+        }
+        .table-scroll::-webkit-scrollbar {
+            width: 5px;
+        }
+        .table-scroll::-webkit-scrollbar-thumb {
+            background: #1E4976;
+            border-radius: 4px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.78rem;
+        }
+        th {
+            position: sticky;
+            top: 0;
+            background-color: #091930;
+            color: var(--text-muted);
+            font-weight: 600;
+            text-align: left;
+            padding: 8px 8px;
+            border-bottom: 1px solid #1E3A5F;
+            z-index: 2;
+        }
+        td {
+            padding: 7px 8px;
+            border-bottom: 1px solid rgba(30, 58, 95, 0.45);
+            color: var(--text-light);
+        }
+        tr:hover td {
+            background-color: rgba(0, 212, 255, 0.08);
+            cursor: pointer;
+        }
+        .num {
+            text-align: right;
+            font-variant-numeric: tabular-nums;
+        }
+        /* Radio / Filter controls inside Ranking card */
+        .ranking-controls {
+            display: flex;
+            gap: 14px;
+            font-size: 0.76rem;
+            color: var(--text-light);
+            margin: 6px 0 10px 0;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .ranking-controls label {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+        .ranking-controls input[type="radio"] {
+            accent-color: var(--cyan);
+        }
+        @media (max-width: 1200px) {
+            .kpi-row { grid-template-columns: repeat(2, 1fr); }
+            .middle-row, .bottom-row { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="dashboard-shell">
+    <!-- Top Header & Slicers -->
+    <header class="top-bar">
+        <div>
+            <div class="brand-title">Analyse Territoriale et Capacitaire des Établissements CPGE au Maroc</div>
+            <div class="brand-sub">Données Officielles Open Data Maroc (Juillet 2026) | 32 Établissements Publics | 12 Régions Administratives</div>
+        </div>
+        <div class="top-controls">
+            <select id="regionSelect" class="filter-select">
+                <option value="ALL">Toutes les Régions (12)</option>
+            </select>
+            <select id="poleSelect" class="filter-select">
+                <option value="ALL">Tous les Pôles Régionaux</option>
+                <option value="Pôles Majeurs (4 à 6 centres)">Pôles Majeurs (4 à 6 centres)</option>
+                <option value="Pôles Intermédiaires (2 à 3 centres)">Pôles Intermédiaires (2 à 3 centres)</option>
+                <option value="Pôles à Centre Unique (1 centre)">Pôles à Centre Unique (1 centre)</option>
+            </select>
+            <input type="text" id="searchInput" class="filter-input" placeholder="Rechercher lycée ou ville..." />
+            <button class="tab-btn active" onclick="resetAll()">Synopsis Global</button>
+        </div>
+    </header>
+
+    <!-- Row 1: 4 KPI Cards with Sparklines -->
+    <section class="kpi-row">
+        <!-- KPI 1 -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Réseau National CPGE</span>
+                <span class="info-icon" title="Nombre d'établissements publics CPGE sélectionnés vs total national">i</span>
+            </div>
+            <div class="kpi-stats">
+                <span class="kpi-main-val" style="color: var(--cyan);" id="kpi1Main">Actifs 32</span>
+                <span class="kpi-sep">|</span>
+                <span class="kpi-sub-val">Total National 32</span>
+            </div>
+            <div class="kpi-growth" id="kpi1Delta">100.0% du Réseau Public &#9650;</div>
+            <svg class="spark-svg" viewBox="0 0 260 60" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="g1" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#00D4FF" stop-opacity="0.42"/>
+                        <stop offset="100%" stop-color="#00D4FF" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                <path d="M0,40 L35,30 L75,38 L115,35 L155,26 L195,12 L230,28 L260,15 L260,60 L0,60 Z" fill="url(#g1)"/>
+                <polyline fill="none" stroke="#38BDF8" stroke-width="2" points="0,40 35,30 75,38 115,35 155,26 195,12 230,28 260,15"/>
+            </svg>
+        </div>
+
+        <!-- KPI 2 -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Couverture Régionale</span>
+                <span class="info-icon" title="Nombre de régions couvertes et densité moyenne par région">i</span>
+            </div>
+            <div class="kpi-stats">
+                <span class="kpi-main-val" style="color: var(--pink);" id="kpi2Main">Régions 12 / 12</span>
+                <span class="kpi-sep">|</span>
+                <span class="kpi-sub-val" id="kpi2Sub">Moy. 2.67 / Rég.</span>
+            </div>
+            <div class="kpi-growth" id="kpi2Delta">100.0% Couverture Territoriale &#9650;</div>
+            <svg class="spark-svg" viewBox="0 0 260 60" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#FF007F" stop-opacity="0.42"/>
+                        <stop offset="100%" stop-color="#FF007F" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                <path d="M0,32 L42,22 L85,48 L128,28 L170,34 L215,16 L260,24 L260,60 L0,60 Z" fill="url(#g2)"/>
+                <polyline fill="none" stroke="#FF007F" stroke-width="2" points="0,32 42,22 85,48 128,28 170,34 215,16 260,24"/>
+            </svg>
+        </div>
+
+        <!-- KPI 3 -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Maillage Provincial & Urbain</span>
+                <span class="info-icon" title="Nombre de provinces/préfectures et communes abritant des centres CPGE">i</span>
+            </div>
+            <div class="kpi-stats">
+                <span class="kpi-main-val" style="color: var(--cyan);" id="kpi3Main">Provinces 25</span>
+                <span class="kpi-sep">|</span>
+                <span class="kpi-sub-val" id="kpi3Sub">Communes 26</span>
+            </div>
+            <div class="kpi-growth" id="kpi3Delta">7 Provinces Bi-Centres (43.8%) &#9650;</div>
+            <svg class="spark-svg" viewBox="0 0 260 60" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="g3" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#A855F7" stop-opacity="0.42"/>
+                        <stop offset="100%" stop-color="#A855F7" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                <path d="M0,35 L45,28 L90,34 L135,24 L180,30 L220,14 L260,26 L260,60 L0,60 Z" fill="url(#g3)"/>
+                <polyline fill="none" stroke="#C084FC" stroke-width="2" points="0,35 45,28 90,34 135,24 180,30 220,14 260,26"/>
+            </svg>
+        </div>
+
+        <!-- KPI 4 -->
+        <div class="card">
+            <div class="card-header">
+                <span class="card-title">Pôle Régional Dominant</span>
+                <span class="info-icon" title="Région enregistrant la plus forte capacité d'établissements CPGE">i</span>
+            </div>
+            <div class="kpi-stats">
+                <span class="kpi-main-val" style="color: var(--amber);" id="kpi4Main">Max 6 Centres</span>
+                <span class="kpi-sep">|</span>
+                <span class="kpi-sub-val" id="kpi4Sub">Casablanca-Settat</span>
+            </div>
+            <div class="kpi-growth" id="kpi4Delta">18.75% du Total National &#9650;</div>
+            <svg class="spark-svg" viewBox="0 0 260 60" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="g4" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#FFB703" stop-opacity="0.42"/>
+                        <stop offset="100%" stop-color="#FFB703" stop-opacity="0.0"/>
+                    </linearGradient>
+                </defs>
+                <path d="M0,34 L45,24 L90,29 L135,36 L180,26 L220,10 L260,22 L260,60 L0,60 Z" fill="url(#g4)"/>
+                <polyline fill="none" stroke="#FFB703" stroke-width="2" points="0,34 45,24 90,29 135,36 180,26 220,10 260,22"/>
+            </svg>
+        </div>
+    </section>
+
+    <!-- Row 2: Regional Bar Chart + Regional Overview Table + Interactive Dark Map -->
+    <section class="middle-row">
+        <!-- Chart 1: Regional Bar Chart (like Sales trend) -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Capacité CPGE par Région vs Moyenne</div>
+                    <div class="card-subtitle">Nombre d'établissements par région par rapport à la moyenne nationale (2.67)</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div id="regionBarChart" class="chart-box"></div>
+        </div>
+
+        <!-- Center Table: Overview by Regions -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Synthèse Territoriale par Région</div>
+                    <div class="card-subtitle">Répartition des centres, provinces, communes, poids national et indice</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div class="table-scroll">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Région</th>
+                            <th class="num">Centres</th>
+                            <th class="num">Provinces</th>
+                            <th class="num">Communes</th>
+                            <th class="num">Part (%)</th>
+                            <th class="num">Indice</th>
+                        </tr>
+                    </thead>
+                    <tbody id="regTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Right: Interactive Map of Establishments -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Cartographie des 32 Établissements CPGE</div>
+                    <div class="card-subtitle">Localisation géographique par catégorie de pôle régional (Cliquez sur un point)</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div id="map"></div>
+        </div>
+    </section>
+
+    <!-- Row 3: Donut Contribution + Province Density Comparison + Interactive Ranking Overview -->
+    <section class="bottom-row">
+        <!-- Donut Chart: Segment Contribution -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Quel Type de Pôle Contribue le Plus à l'Offre ?</div>
+                    <div class="card-subtitle">Poids des Pôles Majeurs (4-6), Intermédiaires (2-3) et Centres Uniques (1)</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div id="donutChart" class="chart-box"></div>
+        </div>
+
+        <!-- Horizontal Lollipop / Arrow Chart: Top Provinces Density -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Analyse de Concentration : Top Provinces Bi-Centres</div>
+                    <div class="card-subtitle">Les 7 provinces disposant de 2 centres CPGE concentrent 43.75% de l'offre nationale</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div id="provinceChart" class="chart-box"></div>
+        </div>
+
+        <!-- Right: Interactive Ranking & Directory Card -->
+        <div class="card">
+            <div class="card-header">
+                <div>
+                    <div class="card-title">Répertoire Classé & Filtrage Rapide</div>
+                    <div class="card-subtitle">Cliquez sur un établissement pour cibler sa position exacte sur la carte</div>
+                </div>
+                <span class="info-icon">i</span>
+            </div>
+            <div class="ranking-controls">
+                <span>Afficher :</span>
+                <label><input type="radio" name="densityFilter" value="ALL" checked onchange="renderAll()"> Tous les Centres</label>
+                <label><input type="radio" name="densityFilter" value="DUAL" onchange="renderAll()"> Villes à 2 Centres (14)</label>
+                <label><input type="radio" name="densityFilter" value="SINGLE" onchange="renderAll()"> Villes à 1 Centre (18)</label>
+            </div>
+            <div class="table-scroll" style="max-height: 250px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Établissement</th>
+                            <th>Commune</th>
+                            <th>Province</th>
+                            <th>Région</th>
+                        </tr>
+                    </thead>
+                    <tbody id="etabTableBody"></tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+</div>
+
+<script>
+    const rawData = [{"id": 1, "nom_etablissement": "Lycée qualifiant Reda Essaoui", "adresse": "Quartier Sidi Mohammed Agadir", "commune": "Agadir (Mun.)", "province": "Préfecture: Agadir-Ida -O", "region": "Souss-Massa", "pole": "Pôles à Centre Unique (1 centre)", "prov_count": 1, "lat": 30.4218, "lon": -9.583}, {"id": 2, "nom_etablissement": "Lycée qualifiant Moulay Ismaïl", "adresse": "Avenue Al-Wahbi Ali Ben Jilali Ville nouvelle Meknès", "commune": "Meknès (Mun.)", "province": "Préfecture: Meknès", "region": "Fès-Meknès", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 33.8966, "lon": -5.5413}, {"id": 3, "nom_etablissement": "Lycée qualifiant Omar Ibn Al-Khattab", "adresse": "Avenue Abdelkrim El Khattabi Sbata", "commune": "Meknès (Mun.)", "province": "Préfecture: Meknès", "region": "Fès-Meknès", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 33.882, "lon": -5.5265}, {"id": 4, "nom_etablissement": "Lycée qualifiant Mohammed V technique", "adresse": "Avenue 20 Août Quartier Atlas", "commune": "Béni Mellal (Mun.)", "province": "Province: Béni Mellal", "region": "Béni Mellal-Khénifra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 32.3394, "lon": -6.3498}, {"id": 5, "nom_etablissement": "Centre des classes préparatoires Ibn Baja", "adresse": "Béni Mellal", "commune": "Béni Mellal (Mun.)", "province": "Province: Béni Mellal", "region": "Béni Mellal-Khénifra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 32.332, "lon": -6.3605}, {"id": 6, "nom_etablissement": "Lycée qualifiant Al-Khansa", "adresse": "15 Rue Er-Riad Sidi Belyout", "commune": "Sidi Belyout (Arrond.)", "province": "Préf. d’Arr. Casablanca A", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 33.5975, "lon": -7.611}, {"id": 7, "nom_etablissement": "Lycée qualifiant Mohammed V", "adresse": "Avenue 2 Mars", "commune": "Mers-Sultan (Arrond.)", "province": "Préf. d’Arr. Al Fida-Mers", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 33.5705, "lon": -7.6168}, {"id": 8, "nom_etablissement": "Lycée qualifiant Al-Razi technique", "adresse": "Avenue Ennakhl", "commune": "El Jadida (Mun.)", "province": "Province: El Jadida", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 33.245, "lon": -8.5085}, {"id": 9, "nom_etablissement": "Lycée qualifiant Moulay Ali Cherif", "adresse": "Quartier Al Massira Errachidia", "commune": "Errachidia (Mun.)", "province": "Province: Errachidia", "region": "Drâa-Tafilalet", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 31.9295, "lon": -4.4285}, {"id": 10, "nom_etablissement": "Lycée qualifiant Moulay Idriss", "adresse": "Bab Boujloud Fès Médina", "commune": "Fès-Médina (Arrond.)", "province": "Préfecture: Fès", "region": "Fès-Meknès", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 34.0617, "lon": -4.983}, {"id": 11, "nom_etablissement": "Lycée qualifiant Bab Sahra", "adresse": "Angle Avenue Mohammed VI Avenue Hammane El Fataouaki", "commune": "Guelmim (Mun.)", "province": "Province: Guelmim", "region": "Guelmim-Oued Noun", "pole": "Pôles à Centre Unique (1 centre)", "prov_count": 1, "lat": 28.988, "lon": -10.057}, {"id": 12, "nom_etablissement": "Lycée qualifiant Mohammed VI", "adresse": "Kénitra", "commune": "Kénitra (Mun.)", "province": "Province: Kénitra", "region": "Rabat-Salé-Kénitra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 34.258, "lon": -6.583}, {"id": 13, "nom_etablissement": "Lycée qualifiant Ibn Al-Banna des classes préparatoires", "adresse": "Avenue  Ibrahim Roudani", "commune": "Khouribga (Mun.)", "province": "Province: Khouribga", "region": "Béni Mellal-Khénifra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 32.8855, "lon": -6.906}, {"id": 14, "nom_etablissement": "Lycée qualifiant Ibn Abdoun", "adresse": "Rue  Al-Mutanabbi", "commune": "Khouribga (Mun.)", "province": "Province: Khouribga", "region": "Béni Mellal-Khénifra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 32.879, "lon": -6.9125}, {"id": 15, "nom_etablissement": "Lycée qualifiant Lissan Eddine Ibn Al-Khatib", "adresse": "Place Oum Saâd, Avenue Hassan Ier", "commune": "Laayoune (Mun.)", "province": "Province: Laâyoune", "region": "Laayoune-Sakia El Hamra", "pole": "Pôles à Centre Unique (1 centre)", "prov_count": 1, "lat": 27.15, "lon": -13.199}, {"id": 16, "nom_etablissement": "Lycée qualifiant Ibn Taymiyya", "adresse": "Hay Hassani BP 851", "commune": "Ménara (Arrond.)", "province": "Préfecture: Marrakech", "region": "Marrakech-Safi", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 2, "lat": 31.6155, "lon": -8.037}, {"id": 17, "nom_etablissement": "École Royale de l’Air", "adresse": "Base des écoles des Forces Royales Air", "commune": "Ménara (Arrond.)", "province": "Préfecture: Marrakech", "region": "Marrakech-Safi", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 2, "lat": 31.609, "lon": -8.025}, {"id": 18, "nom_etablissement": "Lycée technique", "adresse": "Avenue Hassan II", "commune": "Mohammadia (Mun.)", "province": "Préfecture: Mohammadia", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 33.687, "lon": -7.382}, {"id": 19, "nom_etablissement": "Lycée qualifiant Abdelkrim El Khattabi", "adresse": "71- Avenue Prince Sidi Mohammed- Nador", "commune": "Nador (Mun.)", "province": "Province: Nador", "region": "Oriental", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 35.1685, "lon": -2.928}, {"id": 20, "nom_etablissement": "Lycée qualifiant Hassan II", "adresse": "Rue Almoravides", "commune": "Dakhla (Mun.)", "province": "Province: Oued Ed-Dahab", "region": "Eddakhla-Oued Eddahab", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 2, "lat": 23.692, "lon": -15.938}, {"id": 21, "nom_etablissement": "Lycée qualifiant Oqba Ibn Nafi", "adresse": "Quartier Al Nahda", "commune": "Dakhla (Mun.)", "province": "Province: Oued Ed-Dahab", "region": "Eddakhla-Oued Eddahab", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 2, "lat": 23.708, "lon": -15.928}, {"id": 22, "nom_etablissement": "Lycée qualifiant Prince héritier Moulay Hassan – classes préparatoires", "adresse": "HAY sidi hssayne", "commune": "Ouarzazate (Mun.)", "province": "Province: Ouarzazate", "region": "Drâa-Tafilalet", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 30.92, "lon": -6.909}, {"id": 23, "nom_etablissement": "Lycée qualifiant Omar Ibn Abdelaziz", "adresse": "Avenue Allal Ben Abdallah", "commune": "Oujda (Mun.)", "province": "Préfecture: Oujda-Angad", "region": "Oriental", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 34.6815, "lon": -1.908}, {"id": 24, "nom_etablissement": "Lycée qualifiant Omar Khayyam", "adresse": "Avenue Abdelouahed El Marrakchi, Quartier L’Olivier, Agdal-Ryad", "commune": "Agdal Riyad (Arrond.)", "province": "Préfecture: Rabat", "region": "Rabat-Salé-Kénitra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 33.9985, "lon": -6.848}, {"id": 25, "nom_etablissement": "Lycée qualifiant Moulay Youssef", "adresse": "Avenue Mohammed V Hassan", "commune": "Hassan (Arrond.)", "province": "Préfecture: Rabat", "region": "Rabat-Salé-Kénitra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 34.0165, "lon": -6.8325}, {"id": 26, "nom_etablissement": "Lycée qualifiant Moulay Abdallah", "adresse": "Quartier Sidi Abdelkrim, Safi", "commune": "Safi (Mun.)", "province": "Province: Safi", "region": "Marrakech-Safi", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 32.299, "lon": -9.237}, {"id": 27, "nom_etablissement": "Lycée qualifiant Salman Al-Farissi", "adresse": "Avenue Marche Verte Commune de Bettana", "commune": "Bettana (Arrond.)", "province": "Préfecture: Salé", "region": "Rabat-Salé-Kénitra", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 34.045, "lon": -6.803}, {"id": 28, "nom_etablissement": "Lycée qualifiant technique", "adresse": "Quartier Al Amal Commune de Settat", "commune": "Settat (Mun.)", "province": "Province: Settat", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 33.001, "lon": -7.616}, {"id": 29, "nom_etablissement": "Centre des classes préparatoires", "adresse": "Quartier Al Amal", "commune": "Settat (Mun.)", "province": "Province: Settat", "region": "Casablanca-Settat", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 2, "lat": 33.0065, "lon": -7.621}, {"id": 30, "nom_etablissement": "Lycée qualifiant Moulay Hassan", "adresse": "Avenue Al-Ouchaq", "commune": "Tanger-Médina (Arrond.)", "province": "Préfecture: Tanger-Assila", "region": "Tanger-Tetouan-Al Hoceima", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 35.7805, "lon": -5.8195}, {"id": 31, "nom_etablissement": "Lycée qualifiant Al-Idrissi", "adresse": "Quartier Al Mosalla, Taza Haute", "commune": "Taza (Mun.)", "province": "Province: Taza", "region": "Fès-Meknès", "pole": "Pôles Majeurs (4 à 6 centres)", "prov_count": 1, "lat": 34.21, "lon": -4.01}, {"id": 32, "nom_etablissement": "Centre des classes préparatoires", "adresse": "aV. joulan wilaya center tetouan", "commune": "Tétouan (Mun.)", "province": "Province: Tétouan", "region": "Tanger-Tetouan-Al Hoceima", "pole": "Pôles Intermédiaires (2 à 3 centres)", "prov_count": 1, "lat": 35.572, "lon": -5.352}];
+
+    const poleColors = {
+        "Pôles Majeurs (4 à 6 centres)": "#00D4FF",
+        "Pôles Intermédiaires (2 à 3 centres)": "#FF007F",
+        "Pôles à Centre Unique (1 centre)": "#FFB703"
+    };
+
+    // Initialiser la carte Leaflet en thème sombre CartoDB Dark Matter
+    const map = L.map('map', { zoomControl: true }).setView([29.3, -7.6], 5);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap &copy; CARTO',
+        subdomains: 'abcd',
+        maxZoom: 18
+    }).addTo(map);
+    const markersLayer = L.layerGroup().addTo(map);
+
+    // Peupler le filtre Région
+    const regionSelect = document.getElementById('regionSelect');
+    const poleSelect = document.getElementById('poleSelect');
+    const searchInput = document.getElementById('searchInput');
+
+    const allRegions = [...new Set(rawData.map(d => d.region))].sort();
+    allRegions.forEach(r => {
+        const opt = document.createElement('option');
+        opt.value = r;
+        opt.textContent = r;
+        regionSelect.appendChild(opt);
+    });
+
+    function getFilteredData() {
+        const selReg = regionSelect.value;
+        const selPole = poleSelect.value;
+        const q = searchInput.value.trim().toLowerCase();
+        const densityMode = document.querySelector('input[name="densityFilter"]:checked').value;
+
+        return rawData.filter(d => {
+            const matchReg = selReg === 'ALL' || d.region === selReg;
+            const matchPole = selPole === 'ALL' || d.pole === selPole;
+            const matchDensity = densityMode === 'ALL' ||
+                (densityMode === 'DUAL' && d.prov_count >= 2) ||
+                (densityMode === 'SINGLE' && d.prov_count === 1);
+            const matchQ = !q ||
+                d.nom_etablissement.toLowerCase().includes(q) ||
+                d.commune.toLowerCase().includes(q) ||
+                d.province.toLowerCase().includes(q) ||
+                d.region.toLowerCase().includes(q) ||
+                d.adresse.toLowerCase().includes(q);
+            return matchReg && matchPole && matchDensity && matchQ;
+        });
+    }
+
+    function renderAll() {
+        const data = getFilteredData();
+        const total = data.length;
+        const uniqRegs = new Set(data.map(d => d.region)).size;
+        const uniqProvs = new Set(data.map(d => d.province)).size;
+        const uniqComs = new Set(data.map(d => d.commune)).size;
+        const avgReg = uniqRegs > 0 ? (total / uniqRegs).toFixed(2) : "0.00";
+
+        // Comptage par région
+        const regCounts = {};
+        data.forEach(d => { regCounts[d.region] = (regCounts[d.region] || 0) + 1; });
+        const sortedReg = Object.entries(regCounts).sort((a, b) => b[1] - a[1]);
+
+        // Mise à jour des 4 KPI Cards
+        document.getElementById('kpi1Main').textContent = `Actifs ${total}`;
+        document.getElementById('kpi1Delta').innerHTML = `${((total / 32) * 100).toFixed(1)}% du Réseau Public &#9650;`;
+
+        document.getElementById('kpi2Main').textContent = `Régions ${uniqRegs} / 12`;
+        document.getElementById('kpi2Sub').textContent = `Moy. ${avgReg} / Rég.`;
+        document.getElementById('kpi2Delta').innerHTML = `${((uniqRegs / 12) * 100).toFixed(1)}% Couverture Territoriale &#9650;`;
+
+        const provCounts = {};
+        data.forEach(d => { provCounts[d.province] = (provCounts[d.province] || 0) + 1; });
+        const dualProvsCount = Object.values(provCounts).filter(v => v >= 2).length;
+
+        document.getElementById('kpi3Main').textContent = `Provinces ${uniqProvs}`;
+        document.getElementById('kpi3Sub').textContent = `Communes ${uniqComs}`;
+        document.getElementById('kpi3Delta').innerHTML = `${dualProvsCount} Provinces Bi-Centres &#9650;`;
+
+        if (sortedReg.length > 0) {
+            const [topR, topC] = sortedReg[0];
+            document.getElementById('kpi4Main').textContent = `Max ${topC} Centres`;
+            document.getElementById('kpi4Sub').textContent = topR;
+            document.getElementById('kpi4Delta').innerHTML = `${((topC / total) * 100).toFixed(2)}% de la Sélection &#9650;`;
+        } else {
+            document.getElementById('kpi4Main').textContent = "Max 0 Centre";
+            document.getElementById('kpi4Sub').textContent = "Aucune";
+            document.getElementById('kpi4Delta').textContent = "0%";
+        }
+
+        // 1. Bar Chart Régional (Cyan homogène + ligne de moyenne)
+        Plotly.react('regionBarChart', [{
+            type: 'bar',
+            x: sortedReg.map(r => r[0]),
+            y: sortedReg.map(r => r[1]),
+            text: sortedReg.map(r => r[1]),
+            textposition: 'outside',
+            textfont: { color: '#E2E8F0', size: 11 },
+            marker: { color: '#00D4FF', line: { width: 0 } },
+            hovertemplate: '<b>%{x}</b><br>Établissements : %{y}<extra></extra>'
+        }], {
+            margin: { t: 18, r: 10, b: 85, l: 32 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#94A3B8', size: 10 },
+            xaxis: { tickangle: -38, showgrid: false, tickfont: { color: '#CBD5E1', size: 10 } },
+            yaxis: {
+                gridcolor: 'rgba(148,163,184,0.12)',
+                dtick: 1,
+                range: [0, 7]
+            },
+            shapes: [{
+                type: 'line',
+                x0: -0.5,
+                x1: Math.max(sortedReg.length - 0.5, 0.5),
+                y0: 2.67,
+                y1: 2.67,
+                line: { color: '#FF007F', width: 1.5, dash: 'dot' }
+            }]
+        }, { responsive: true, displayModeBar: false });
+
+        // 2. Tableau Analytique par Région
+        const regTbody = document.getElementById('regTableBody');
+        regTbody.innerHTML = '';
+        sortedReg.forEach(([rName, cCount]) => {
+            const sub = data.filter(d => d.region === rName);
+            const pCount = new Set(sub.map(d => d.province)).size;
+            const comCount = new Set(sub.map(d => d.commune)).size;
+            const pct = total > 0 ? ((cCount / total) * 100).toFixed(1) : "0.0";
+            const idx = (cCount / 2.6667).toFixed(2);
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td>${rName}</td>
+                <td class="num" style="color:var(--cyan); font-weight:700;">${cCount}</td>
+                <td class="num">${pCount}</td>
+                <td class="num">${comCount}</td>
+                <td class="num">${pct}%</td>
+                <td class="num">${idx}x</td>
+            `;
+            tr.onclick = () => {
+                regionSelect.value = (regionSelect.value === rName ? 'ALL' : rName);
+                renderAll();
+            };
+            regTbody.appendChild(tr);
+        });
+
+        // 3. Carte Géographique Sombre avec Points Lumineux
+        markersLayer.clearLayers();
+        const bounds = [];
+        data.forEach(d => {
+            const col = poleColors[d.pole] || '#00D4FF';
+            const marker = L.circleMarker([d.lat, d.lon], {
+                radius: 7.5,
+                fillColor: col,
+                color: '#061325',
+                weight: 1.8,
+                opacity: 1,
+                fillOpacity: 0.95
+            });
+            marker.bindPopup(`
+                <div style="font-family:'Inter',sans-serif; font-size:12px; color:#0F172A; line-height:1.45;">
+                    <strong style="color:#005A9E; font-size:13px;">${d.nom_etablissement}</strong><br>
+                    <b>Région :</b> ${d.region}<br>
+                    <b>Province :</b> ${d.province}<br>
+                    <b>Commune :</b> ${d.commune}<br>
+                    <b>Adresse :</b> ${d.adresse}
+                </div>
+            `);
+            marker.addTo(markersLayer);
+            bounds.push([d.lat, d.lon]);
+        });
+        if (bounds.length > 0 && bounds.length < rawData.length) {
+            map.fitBounds(bounds, { padding: [35, 35], maxZoom: 12 });
+        } else if (bounds.length === rawData.length) {
+            map.setView([29.3, -7.6], 5);
+        }
+
+        // 4. Donut Chart : Contribution par Type de Pôle Régional
+        const poleCounts = {
+            "Pôles Majeurs (4 à 6 centres)": 0,
+            "Pôles Intermédiaires (2 à 3 centres)": 0,
+            "Pôles à Centre Unique (1 centre)": 0
+        };
+        data.forEach(d => { poleCounts[d.pole] = (poleCounts[d.pole] || 0) + 1; });
+        const pLabels = Object.keys(poleCounts).filter(k => poleCounts[k] > 0);
+        const pValues = pLabels.map(k => poleCounts[k]);
+        const pCols = pLabels.map(k => poleColors[k]);
+
+        Plotly.react('donutChart', [{
+            type: 'pie',
+            labels: pLabels,
+            values: pValues,
+            hole: 0.42,
+            marker: { colors: pCols, line: { color: '#0C213B', width: 2 } },
+            textinfo: 'percent',
+            textfont: { color: '#FFFFFF', size: 12 },
+            hovertemplate: '<b>%{label}</b><br>Centres : %{value} (%{percent})<extra></extra>'
+        }], {
+            margin: { t: 10, r: 10, b: 40, l: 10 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#CBD5E1', size: 10 },
+            legend: { orientation: 'h', y: -0.18, x: 0.5, xanchor: 'center', font: { size: 10, color: '#CBD5E1' } }
+        }, { responsive: true, displayModeBar: false });
+
+        // 5. Horizontal Province Concentration Chart
+        const sortedProvs = Object.entries(provCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 9)
+            .reverse();
+
+        Plotly.react('provinceChart', [{
+            type: 'bar',
+            orientation: 'h',
+            x: sortedProvs.map(p => p[1]),
+            y: sortedProvs.map(p => p[0].replace('Préfecture: ', '').replace('Province: ', '')),
+            text: sortedProvs.map(p => p[1] === 2 ? '2 centres (6.25%)' : '1 centre (3.13%)'),
+            textposition: 'outside',
+            textfont: { color: '#00E5A3', size: 10 },
+            marker: {
+                color: sortedProvs.map(p => p[1] >= 2 ? '#00D4FF' : '#1E4976')
+            },
+            hovertemplate: '<b>%{y}</b><br>Centres CPGE : %{x}<extra></extra>'
+        }], {
+            margin: { t: 10, r: 95, b: 30, l: 110 },
+            paper_bgcolor: 'rgba(0,0,0,0)',
+            plot_bgcolor: 'rgba(0,0,0,0)',
+            font: { color: '#CBD5E1', size: 10 },
+            xaxis: {
+                title: 'Nombre de centres CPGE',
+                gridcolor: 'rgba(148,163,184,0.12)',
+                dtick: 1,
+                range: [0, 2.75]
+            },
+            yaxis: { showgrid: false }
+        }, { responsive: true, displayModeBar: false });
+
+        // 6. Répertoire Classé des Établissements
+        const etabTbody = document.getElementById('etabTableBody');
+        etabTbody.innerHTML = '';
+        data.forEach(d => {
+            const tr = document.createElement('tr');
+            const shortProv = d.province.replace('Préfecture: ', '').replace('Province: ', '');
+            const shortCom = d.commune.replace(' (Mun.)', '').replace(' (Arrond.)', '');
+            tr.innerHTML = `
+                <td style="color:var(--cyan); font-weight:600;">${d.nom_etablissement}</td>
+                <td>${shortCom}</td>
+                <td>${shortProv}</td>
+                <td>${d.region}</td>
+            `;
+            tr.onclick = () => {
+                map.setView([d.lat, d.lon], 13);
+            };
+            etabTbody.appendChild(tr);
+        });
+    }
+
+    regionSelect.addEventListener('change', renderAll);
+    poleSelect.addEventListener('change', renderAll);
+    searchInput.addEventListener('input', renderAll);
+
+    function resetAll() {
+        regionSelect.value = 'ALL';
+        poleSelect.value = 'ALL';
+        searchInput.value = '';
+        document.querySelector('input[name="densityFilter"][value="ALL"]').checked = true;
+        renderAll();
+    }
+
+    renderAll();
+</script>
+</body>
+</html>
